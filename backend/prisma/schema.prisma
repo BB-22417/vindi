@@ -1,0 +1,375 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum SymptomSeverity {
+  MILD
+  MODERATE
+  SEVERE
+  VERY_SEVERE
+}
+
+enum PlanTier {
+  BASIC
+  PREMIUM
+  PREMIUM_PLUS
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  PAST_DUE
+  TRIALING
+  EXPIRED
+}
+
+enum PaymentProvider {
+  STRIPE
+  PAYPAL
+}
+
+enum InterventionType {
+  HRT
+  SUPPLEMENT
+  VITAMIN
+  SLEEP_PROGRAM
+  EXERCISE_PLAN
+  DIET_CHANGE
+  MEDICATION
+}
+
+enum NotificationType {
+  DAILY_CHECKIN
+  MEDICATION
+  SUPPLEMENT
+  APPOINTMENT
+  REPORT
+}
+
+enum ReportFormat {
+  PDF
+  CSV
+}
+
+enum InsightType {
+  CORRELATION
+  TREND
+  PATTERN
+  FORECAST
+}
+
+enum CyclePhase {
+  MENSTRUAL
+  FOLLICULAR
+  OVULATORY
+  LUTEAL
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String
+  name          String
+  role          UserRole @default(USER)
+  dateOfBirth   DateTime?
+  phone         String?
+  avatar        String?
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  profile       Profile?
+  dailyLogs     DailyLog[]
+  cycles        Cycle[]
+  interventions Intervention[]
+  reports       Report[]
+  subscription  Subscription?
+  payments      Payment[]
+  notifications Notification[]
+  communityPosts CommunityPost[]
+  comments      Comment[]
+  adminLogs     AdminLog[]
+  vindiScores   VindiScore[]
+  aiInsights    AiInsight[]
+  savedSymptoms UserSavedSymptom[]
+
+  @@map("users")
+}
+
+model Profile {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  timezone         String?
+  height           Float?
+  weight           Float?
+  birthYear        Int?
+  menopauseStatus  String?
+  symptomsStartedAt DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+model DailyLog {
+  id                   String   @id @default(uuid())
+  userId               String
+  date                 DateTime
+  sleepHours           Float?
+  sleepQuality         Int?
+  nightAwakenings      Int?
+  nightSweats          Boolean?
+  moodScore            Int?
+  anxietyScore         Int?
+  stressScore          Int?
+  irritabilityScore    Int?
+  energyLevel          Int?
+  brainFog             Int?
+  focusLevel           Int?
+  memoryIssues         Int?
+  hotFlashes           SymptomSeverity?
+  jointPain            SymptomSeverity?
+  headaches            SymptomSeverity?
+  heartPalpitations    SymptomSeverity?
+  breastTenderness     SymptomSeverity?
+  bloating             SymptomSeverity?
+  lowLibido            SymptomSeverity?
+  weight               Float?
+  bloodPressureSystolic Int?
+  bloodPressureDiastolic Int?
+  bodyTemperature      Float?
+  exercise             Boolean?
+  alcoholIntake        Int?
+  waterIntake          Int?
+  caffeineIntake       Int?
+  nutritionScore       Int?
+  notes                String?
+  createdAt            DateTime @default(now())
+
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symptomEntries SymptomEntry[]
+
+  @@unique([userId, date])
+  @@map("daily_logs")
+}
+
+model SymptomEntry {
+  id         String          @id @default(uuid())
+  dailyLogId String
+  symptomType String
+  severity   SymptomSeverity
+  timeOfDay  String?
+  duration   Int?
+  notes      String?
+  createdAt  DateTime        @default(now())
+
+  dailyLog DailyLog @relation(fields: [dailyLogId], references: [id], onDelete: Cascade)
+  savedBy  UserSavedSymptom[]
+
+  @@map("symptom_entries")
+}
+
+model UserSavedSymptom {
+  userId         String
+  symptomEntryId String
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symptomEntry SymptomEntry @relation(fields: [symptomEntryId], references: [id], onDelete: Cascade)
+
+  @@id([userId, symptomEntryId])
+  @@map("user_saved_symptoms")
+}
+
+model Cycle {
+  id           String     @id @default(uuid())
+  userId       String
+  startDate    DateTime
+  endDate      DateTime?
+  spotting     Boolean?
+  flowIntensity Int?
+  phase        CyclePhase
+  symptoms     String?
+  notes        String?
+  createdAt    DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("cycles")
+}
+
+model Intervention {
+  id                  String           @id @default(uuid())
+  userId              String
+  type                InterventionType
+  name                String
+  startDate           DateTime
+  endDate             DateTime?
+  cost                Float?
+  dosage              String?
+  frequency           String?
+  notes               String?
+  effectivenessRating Int?
+  createdAt           DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("interventions")
+}
+
+model VindiScore {
+  id          String   @id @default(uuid())
+  userId      String
+  date        DateTime
+  score       Int
+  trend       String   @default("STABLE")
+  dailyScore  Int?
+  weeklyScore Int?
+  monthlyScore Int?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("vindi_scores")
+}
+
+model AiInsight {
+  id              String     @id @default(uuid())
+  userId          String
+  type            InsightType
+  title           String
+  description     String
+  severity        String?
+  relatedSymptoms Json?
+  recommendation  String?
+  createdAt       DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_insights")
+}
+
+model Report {
+  id         String       @id @default(uuid())
+  userId     String
+  title      String
+  format     ReportFormat
+  dateRange  String?
+  url        String
+  generatedAt DateTime   @default(now())
+  createdAt  DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+model Subscription {
+  id                    String             @id @default(uuid())
+  userId                String             @unique
+  plan                  PlanTier
+  status                SubscriptionStatus
+  provider              PaymentProvider?
+  providerSubscriptionId String?
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  trialEnd              DateTime?
+  canceledAt            DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@map("subscriptions")
+}
+
+model Payment {
+  id                String          @id @default(uuid())
+  userId            String
+  subscriptionId    String?
+  amount            Float
+  currency          String          @default("USD")
+  status            String
+  provider          PaymentProvider
+  providerPaymentId String?
+  invoiceUrl        String?
+  createdAt         DateTime        @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@map("payments")
+}
+
+model Notification {
+  id           String           @id @default(uuid())
+  userId       String
+  type         NotificationType
+  title        String
+  message      String
+  read         Boolean          @default(false)
+  scheduledFor DateTime?
+  sentAt       DateTime?
+  createdAt    DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model CommunityPost {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  content   String
+  anonymous Boolean  @default(false)
+  tags      String?
+  upvotes   Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments Comment[]
+
+  @@map("community_posts")
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("comments")
+}
+
+model AdminLog {
+  id        String   @id @default(uuid())
+  adminId   String
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("admin_logs")
+}
